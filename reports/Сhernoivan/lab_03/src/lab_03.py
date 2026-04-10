@@ -1,0 +1,195 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+X = np.array([
+    [6, 6],
+    [-6, 6],
+    [6, -6],
+    [-6, -6]
+], dtype=float)
+
+E = np.array([1 if x[0] > 0 else 0 for x in X], dtype=float)
+
+epochs = 100
+Ee = 0.01
+
+def sigmoid(S):
+    return 1 / (1 + np.exp(-S))
+
+def BCE_loss(y, e):
+    eps = 1e-9
+    return -(e*np.log(y+eps) + (1-e)*np.log(1-y+eps))
+
+def train_MSE_fixed(X, E, eta):
+    w = np.random.randn(2)
+    T = np.random.randn()
+    errors = []
+
+    for epoch in range(epochs):
+        mse = 0
+        for x, e in zip(X, E):
+            S = np.dot(w, x) - T
+            y = S
+            error = e - y
+            mse += error**2
+
+            w += eta * error * x
+            T -= eta * error
+
+        errors.append(mse/len(X))
+        if errors[-1] <= Ee:
+            break
+
+    return w, T, errors
+
+def train_MSE_adaptive(X, E):
+    w = np.random.randn(2)
+    T = np.random.randn()
+    errors = []
+    t = 1
+
+    for epoch in range(epochs):
+        mse = 0
+        for x, e in zip(X, E):
+
+            eta = 0.5 / t
+            t += 1
+
+            S = np.dot(w, x) - T
+            y = S
+            error = e - y
+            mse += error**2
+
+            w += eta * error * x
+            T -= eta * error
+
+        errors.append(mse/len(X))
+        if errors[-1] <= Ee:
+            break
+
+    return w, T, errors
+
+def train_BCE_fixed(X, E, eta):
+    w = np.random.randn(2)
+    T = np.random.randn()
+    errors = []
+
+    for epoch in range(epochs):
+        ce = 0
+        for x, e in zip(X, E):
+
+            S = np.dot(w, x) - T
+            y = sigmoid(S)
+
+            ce += BCE_loss(y, e)
+
+            grad = (y - e)
+            w -= eta * grad * x
+            T += eta * grad
+
+        errors.append(ce/len(X))
+        if errors[-1] <= Ee:
+            break
+
+    return w, T, errors
+
+
+def train_BCE_adaptive(X, E):
+    w = np.random.randn(2)
+    T = np.random.randn()
+    errors = []
+    t = 1
+
+    for epoch in range(epochs):
+        ce = 0
+        for x, e in zip(X, E):
+
+            eta = 1 / t
+            t += 1
+
+            S = np.dot(w, x) - T
+            y = sigmoid(S)
+
+            ce += BCE_loss(y, e)
+
+            grad = (y - e)
+            w -= eta * grad * x
+            T += eta * grad
+
+        errors.append(ce/len(X))
+        if errors[-1] <= Ee:
+            break
+
+    return w, T, errors
+
+
+w1, T1, e1 = train_MSE_fixed(X, E, 0.01)
+w2, T2, e2 = train_MSE_adaptive(X, E)
+w3, T3, e3 = train_BCE_fixed(X, E, 0.01)
+w4, T4, e4 = train_BCE_adaptive(X, E)
+
+plt.figure(figsize=(8,5))
+plt.plot(e1, label="MSE + фикс")
+plt.plot(e2, label="MSE + адапт")
+plt.plot(e3, label="BCE + фикс")
+plt.plot(e4, label="BCE + адапт")
+plt.xlabel("Эпоха")
+plt.ylabel("Ошибка")
+plt.title("Сравнение сходимости")
+plt.legend()
+plt.grid()
+plt.show()
+
+plt.figure(figsize=(7,7))
+
+for i in range(len(X)):
+    color = "red" if E[i] == 1 else "blue"
+    plt.scatter(X[i,0], X[i,1], color=color, s=100)
+
+x_line = np.linspace(-7, 7, 300)
+y_line = (T4 - w4[0]*x_line) / w4[1]
+plt.plot(x_line, y_line, 'k', linewidth=2)
+
+plt.xlim(-7, 7)
+plt.ylim(-7, 7)
+plt.grid()
+plt.title("Разделяющая линия BCE (адаптивный шаг)")
+plt.show()
+
+
+def classify(x1, x2):
+
+    S = w4[0]*x1 + w4[1]*x2 - T4
+    y_prob = sigmoid(S)
+    y_class = 1 if y_prob >= 0.5 else 0
+
+    print("\n========== РЕЗУЛЬТАТ ==========")
+    print(f"Вероятность класса 1: {y_prob:.4f}")
+    print(f"Предсказанный класс: {y_class}")
+    print("================================\n")
+
+    plt.figure(figsize=(7,7))
+
+    for i in range(len(X)):
+        color = "red" if E[i] == 1 else "blue"
+        plt.scatter(X[i,0], X[i,1], color=color, s=100)
+
+    plt.plot(x_line, y_line, 'k')
+    plt.scatter(x1, x2, color="green", s=150, marker="x")
+
+    plt.xlim(-7, 7)
+    plt.ylim(-7, 7)
+    plt.grid()
+    plt.title("Классификация точки")
+    plt.show()
+
+while True:
+    x1 = input("x1 (exit для выхода): ")
+    if x1 == "exit":
+        break
+    x2 = input("x2: ")
+
+    try:
+        classify(float(x1), float(x2))
+    except:
+        print("Ошибка ввода")
